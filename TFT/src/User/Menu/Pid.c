@@ -37,6 +37,8 @@ bool pidSucceeded = false;
 bool pidRunning = false;
 bool pidInitialized = false;
 
+bool previosKnob_led_idleState = false;
+
 void pidUpdateStatus(bool succeeded)
 {
   if (pidCounter > 0)
@@ -166,6 +168,16 @@ void pidStart(void)
   pidTimeout = OS_GetTimeMs() + PID_PROCESS_TIMEOUT;                           // set timeout for overall PID process
 
   mustStoreCmd("M42 P4 S0\nM42 P5 S255\nM42 P6 S0\n");                         // set LED light to RED
+
+  #ifdef LED_COLOR_PIN
+    WS2812_Send_DAT(led_color[LED_RED]);                                       // Set the knob_led to RED
+    if(infoSettings.knob_led_idle)
+    {
+      infoSettings.knob_led_idle = 0;                                          // Turn the led_idle temporarily off. Prevent it for going off when screen is idle 
+      previosKnob_led_idleState = true;                                        // Remember wat it was on before
+    }
+  #endif
+
   mustStoreCmd("M106 S255\n");                                                 // set fan speed to max
   mustStoreCmd("G4 S1\n");                                                     // wait 1 sec
 
@@ -180,6 +192,11 @@ void pidStart(void)
 
   mustStoreCmd("M107\n");                                                      // stop fan
   mustStoreCmd("M42 P4 S255\nM42 P5 S0\nM42 P6 S0\n");                         // set LED light to GREEN
+
+  #ifdef LED_COLOR_PIN
+    WS2812_Send_DAT(led_color[LED_GREEN]);                                     // Set the knob led to green (tell the user it's done)
+  #endif
+
 
   infoMenu.menu[++infoMenu.cur] = menuPidWait;
 }
@@ -238,6 +255,16 @@ void menuPid(void)
 
   menuDrawPage(&pidItems);
   pidTemperatureReDraw(false);
+
+  #ifdef LED_COLOR_PIN
+    // restore the knob led to what the user configured it to.
+    // (with the tuning it's set to red or green)
+    WS2812_Send_DAT(led_color[infoSettings.knob_led_color]);
+
+    // Set the knob_led_idle back to what it was before
+    infoSettings.knob_led_idle = previosKnob_led_idleState;
+  #endif
+
 
   while (infoMenu.menu[infoMenu.cur] == menuPid)
   {
